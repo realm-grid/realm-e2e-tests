@@ -1,0 +1,101 @@
+name: E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - acc
+          - prod
+      tags:
+        description: 'Behave tags to run (e.g., @smoke)'
+        required: false
+        default: ''
+
+jobs:
+  e2e-tests:
+    name: E2E Tests - ${{ github.event.inputs.environment || 'dev' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install chromium
+      
+      - name: Create .env file
+        run: |
+          echo "ENVIRONMENT=${{ env.ENVIRONMENT }}" >> .env
+          echo "ADMIN_URL=${{ secrets.ADMIN_URL }}" >> .env
+          echo "WEB_URL=${{ secrets.WEB_URL }}" >> .env
+          echo "FUNCTIONS_URL=${{ secrets.FUNCTIONS_URL }}" >> .env
+          echo "TEST_USER_EMAIL=${{ secrets.TEST_USER_EMAIL }}" >> .env
+          echo "TEST_USER_PASSWORD=${{ secrets.TEST_USER_PASSWORD }}" >> .env
+          echo "ADMIN_USER_EMAIL=${{ secrets.ADMIN_USER_EMAIL }}" >> .env
+          echo "ADMIN_USER_PASSWORD=${{ secrets.ADMIN_USER_PASSWORD }}" >> .env
+          echo "STRIPE_TEST_CARD=4242424242424242" >> .env
+          echo "STRIPE_TEST_CVC=123" >> .env
+          echo "STRIPE_TEST_EXP_MONTH=12" >> .env
+          echo "STRIPE_TEST_EXP_YEAR=2030" >> .env
+          echo "MOLLIE_TEST_MODE=true" >> .env
+          echo "HEADLESS=true" >> .env
+      
+      - name: Run smoke tests
+        if: github.event_name == 'pull_request'
+        run: behave --tags=@smoke --format json --outfile reports/smoke.json
+      
+      - name: Run full regression
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          TAGS="${{ github.event.inputs.tags }}"
+          if [ -z "$TAGS" ]; then
+            behave --format json --outfile reports/results.json
+          else
+            behave --tags="$TAGS" --format json --outfile reports/results.json
+          fi
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ env.ENVIRONMENT }}
+          path: |
+            reports/
+            screenshots/
+      
+      - name: Publish test summary
+        if: always()
+        run: |
+          echo "## Test Results - ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f reports/results.json ]; then
+            python -c "import json; r=json.load(open('reports/results.json')); print(f'✅ Passed: {sum(1 for f in r if f[\"status\"]==\"passed\")}')" >> $GITHUB_STEP_SUMMARY
+            python -c "import json; r=json.load(open('reports/results.json')); print(f'❌ Failed: {sum(1 for f in r if f[\"status\"]==\"failed\")}')" >> $GITHUB_STEP_SUMMARY
+          fi
