@@ -61,7 +61,7 @@ def step_impl(context, button_text):
 def step_impl(context):
     context.page.click('button:has-text("Confirm")')
 
-@then('I should see "{message}"')
+@then('I should see an admin message "{message}"')
 def step_impl(context, message):
     assert context.page.locator(f'text="{message}"').is_visible()
 

@@ -230,23 +230,7 @@ def step_server_restored(context):
 
 
 # ============================================================================
-# SUBSCRIPTION ASSERTIONS
+# SUBSCRIPTION ASSERTIONS (handled in web_steps.py)
 # ============================================================================
-
-@then('the subscription status should be "{status}"')
-def step_subscription_status(context, status):
-    data = context.response_data.get("data", {})
-    assert data.get("status") == status, \
-        f"Expected status '{status}', got '{data.get('status')}'"
-
-
-@then('the server should still be running')
-def step_server_running(context):
-    # Would need to check K8s or make another API call
-    pass
-
-
-@then('the server should be stopped')
-def step_server_stopped(context):
-    # Would need to check K8s or make another API call
-    pass
+# Note: Subscription status assertions are defined in web_steps.py
+# to avoid duplication with admin_steps.py
