@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.fast
+    environment:
+      - ADMIN_URL=http://host.docker.internal:4321
+      - HEADLESS=true
+    volumes:
+      - ./reports:/app/reports
+    network_mode: host
+    # Use host network so Docker can access localhost:4321
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

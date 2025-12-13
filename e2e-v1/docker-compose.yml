@@ -1,0 +1,55 @@
+# E2E Test Environment - Full Azure Integration
+# Uses real Azure Functions API with Easy Auth
+# Use: ./run-e2e.sh or: docker compose up -d admin && docker compose run e2e-tests
+
+services:
+  # Realm Admin Frontend (connects to real Azure Functions)
+  admin:
+    build:
+      context: ../../realm-admin
+      dockerfile: Dockerfile.e2e
+    image: realm-admin-e2e:latest
+    ports:
+      - "15173:5173"  # Use different port to avoid conflicts
+    environment:
+      # Connect to real Azure Functions (base URL without /api suffix)
+      - VITE_API_URL=https://realm-dev-api-fa.azurewebsites.net/api
+      - FUNCTION_APP_URL=https://realm-dev-api-fa.azurewebsites.net
+      - NODE_ENV=production
+      - E2E_TEST=true
+      # Azure AD Easy Auth credentials for authenticating with Function Apps
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
+      - AZURE_FA_CLIENT_ID=${AZURE_FA_CLIENT_ID}
+      - AZURE_FA_CLIENT_SECRET=${AZURE_FA_CLIENT_SECRET}
+      - FUNCTION_APP_CLIENT_ID=${FUNCTION_APP_CLIENT_ID:-6442f6e5-5f42-46dd-bbba-b80518ddfa9a}
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:5173"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - e2e-network
+
+  # E2E Test Runner
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: realm-e2e-tests:latest
+    environment:
+      - ADMIN_URL=http://admin:5173
+      - FUNCTIONS_URL=${FUNCTIONS_BASE_URL:-https://realm-dev-api-fa.azurewebsites.net}
+      - CI=true
+    depends_on:
+      admin:
+        condition: service_healthy
+    volumes:
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge

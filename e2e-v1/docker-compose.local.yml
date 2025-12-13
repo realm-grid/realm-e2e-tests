@@ -1,0 +1,85 @@
+# E2E Test Environment - Local/Isolated Mode
+# Runs realm-admin and realm-functions in Docker containers
+# Auth is bypassed for testing purposes
+# Use: docker compose -f docker-compose.local.yml up -d && docker compose -f docker-compose.local.yml run e2e-tests
+
+services:
+  # Local Azure Functions API (no Easy Auth)
+  functions:
+    build:
+      context: ../../realm-functions
+      dockerfile: Dockerfile.e2e
+    image: realm-functions-e2e:latest
+    ports:
+      - "17071:80"
+    environment:
+      - AzureWebJobsStorage=UseDevelopmentStorage=true
+      - FUNCTIONS_WORKER_RUNTIME=python
+      - COSMOS_ENDPOINT=${COSMOS_ENDPOINT}
+      - COSMOS_DATABASE=${COSMOS_DATABASE:-realm-dev}
+      - JWT_SECRET=${JWT_SECRET:-test-jwt-secret-for-e2e-testing}
+      - ENVIRONMENT=test
+      # Disable Easy Auth validation for local testing
+      - E2E_TEST=true
+      - SKIP_AUTH_VALIDATION=true
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:80/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - e2e-network
+
+  # Realm Admin Frontend (connects to local functions)
+  admin:
+    build:
+      context: ../../realm-admin
+      dockerfile: Dockerfile.e2e
+    image: realm-admin-e2e:latest
+    ports:
+      - "15173:5173"
+    environment:
+      - VITE_API_URL=http://functions:80/api
+      - FUNCTION_APP_URL=http://functions:80
+      - NODE_ENV=production
+      - E2E_TEST=true
+      # No Easy Auth needed for local functions
+      - COSMOS_ENDPOINT=${COSMOS_ENDPOINT}
+      - COSMOS_DATABASE=${COSMOS_DATABASE:-realm-dev}
+    depends_on:
+      functions:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:5173"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - e2e-network
+
+  # E2E Test Runner
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: realm-e2e-tests:latest
+    environment:
+      - ADMIN_URL=http://admin:5173
+      - FUNCTIONS_URL=http://functions:80
+      - CI=true
+    depends_on:
+      admin:
+        condition: service_healthy
+      functions:
+        condition: service_healthy
+    volumes:
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge

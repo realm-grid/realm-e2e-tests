@@ -1,0 +1,26 @@
+{
+  "name": "realm-e2e-playwright",
+  "version": "1.0.0",
+  "description": "Playwright E2E tests for RealmGrid platform",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:full-flow": "playwright test tests/full-e2e-flow.spec.ts",
+    "test:api": "playwright test tests/full-e2e-flow.spec.ts --grep='API'",
+    "report": "playwright show-report ../reports/playwright",
+    "install:browsers": "playwright install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

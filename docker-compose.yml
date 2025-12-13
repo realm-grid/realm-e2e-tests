@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: realm-e2e-tests
+    environment:
+      # Environment settings
+      - ENVIRONMENT=dev
+      - HEADLESS=true
+      - SLOW_MO=0
+      - BROWSER=chromium
+      
+      # Azure Resources URLs
+      - WEB_URL=https://dev.app.realmgrid.com
+      - ADMIN_URL=https://dev.admin.realmgrid.com
+      - FUNCTIONS_URL=https://realm-dev-api-fa.azurewebsites.net
+      - WEB_APP_URL=https://dev.app.realmgrid.com
+      
+      # SSO Test Credentials (override from .env or secrets)
+      - SSO_TEST_USER_EMAIL=${SSO_TEST_USER_EMAIL:-test.sso.user@xevolve.io}
+      - SSO_TEST_USER_PASSWORD=${SSO_TEST_USER_PASSWORD}
+      
+      # Legacy test users
+      - TEST_USER_EMAIL=${TEST_USER_EMAIL:-test@example.com}
+      - TEST_USER_PASSWORD=${TEST_USER_PASSWORD:-Test123!}
+      - ADMIN_USER_EMAIL=${ADMIN_USER_EMAIL:-admin@realmgrid.com}
+      - ADMIN_USER_PASSWORD=${ADMIN_USER_PASSWORD:-Admin123!}
+    volumes:
+      - ./reports:/app/reports
+    networks:
+      - e2e-network
+    # Run SSO auth tests by default
+    command: ["behave", "features/auth/", "--tags=@sso", "--no-capture", "-v"]
+
+  # Optional: Run all smoke tests
+  e2e-smoke:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: realm-e2e-smoke
+    profiles: ["smoke"]
+    environment:
+      - ENVIRONMENT=dev
+      - HEADLESS=true
+      - WEB_URL=https://dev.app.realmgrid.com
+      - ADMIN_URL=https://dev.admin.realmgrid.com
+      - FUNCTIONS_URL=https://realm-dev-api-fa.azurewebsites.net
+      - SSO_TEST_USER_EMAIL=${SSO_TEST_USER_EMAIL}
+      - SSO_TEST_USER_PASSWORD=${SSO_TEST_USER_PASSWORD}
+    volumes:
+      - ./reports:/app/reports
+    networks:
+      - e2e-network
+    command: ["behave", "features/", "--tags=@smoke", "--no-capture", "-v"]
+
+networks:
+  e2e-network:
+    driver: bridge

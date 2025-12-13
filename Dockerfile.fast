@@ -1,0 +1,40 @@
+# Fast E2E Test Runner with Behave + Playwright
+# Uses pre-built Playwright image for speed
+FROM mcr.microsoft.com/playwright/python:v1.49.0-noble
+
+LABEL maintainer="RealmGrid Team"
+LABEL description="Fast E2E Test Runner for Admin Portal"
+
+WORKDIR /app
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HEADLESS=true \
+    BROWSER=chromium \
+    ADMIN_URL=http://host.docker.internal:4321
+
+# Copy and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Chromium is already installed in the base image
+# Just ensure deps are there
+RUN playwright install-deps chromium
+
+# Copy test files
+COPY features/ ./features/
+COPY environment.py .
+COPY behave.ini .
+
+# Create reports directory
+RUN mkdir -p /app/reports/screenshots /app/reports/cucumber
+
+# Run tests with Cucumber JSON output
+CMD ["behave", \
+     "features/admin/production-data.feature", \
+     "--format=json", \
+     "--outfile=reports/cucumber/results.json", \
+     "--format=pretty", \
+     "--no-capture", \
+     "-v"]

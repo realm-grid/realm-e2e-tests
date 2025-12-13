@@ -39,7 +39,7 @@ def step_initiate_sso_login(context):
         context.auth_user = result.user
 
 
-@when('I click the "Sign in with Microsoft" button')
+@when('I click the SSO Microsoft button')
 def step_click_sso_button(context):
     """Click SSO login button or navigate to SSO endpoint"""
     selectors = [
